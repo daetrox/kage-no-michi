@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# Empaqueta build/dist como AppImage (x86_64). Requiere haber ejecutado ./build.sh antes.
+# Uso: packaging/make_appimage.sh [versión]
+set -euo pipefail
+cd "$(dirname "$0")/.."
+ROOT="$PWD"
+VERSION="${1:-dev}"
+APPDIR="$ROOT/build/AppDir"
+TOOL="$ROOT/build/appimagetool-x86_64.AppImage"
+
+rm -rf "$APPDIR"
+mkdir -p "$APPDIR/usr/lib/kagenomichi"
+cp -r "$ROOT/build/dist/." "$APPDIR/usr/lib/kagenomichi/"
+# Nunca empaquetar el juego ni las BIOS del usuario.
+rm -rf "$APPDIR/usr/lib/kagenomichi/game" "$APPDIR/usr/lib/kagenomichi/bios" "$APPDIR/usr/lib/kagenomichi/kagenomichi.desktop"
+
+cp "$ROOT/packaging/kagenomichi.png" "$APPDIR/kagenomichi.png"
+cat > "$APPDIR/kagenomichi.desktop" <<DESKTOP
+[Desktop Entry]
+Type=Application
+Name=Kage no Michi
+Comment=El Camino de las Sombras: lanzador para Tenchu
+Exec=kagenomichi
+Icon=kagenomichi
+Categories=Game;
+DESKTOP
+cat > "$APPDIR/AppRun" <<'APPRUN'
+#!/bin/sh
+HERE="$(dirname "$(readlink -f "$0")")"
+exec "$HERE/usr/lib/kagenomichi/kagenomichi" "$@"
+APPRUN
+chmod +x "$APPDIR/AppRun"
+
+if [ ! -x "$TOOL" ]; then
+  curl -sSfL -o "$TOOL" https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+  chmod +x "$TOOL"
+fi
+# Sin FUSE (p. ej. en GitHub Actions) la herramienta se extrae y se ejecuta sola.
+OUT="$ROOT/KageNoMichi-$VERSION-x86_64.AppImage"
+ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 "$TOOL" --no-appstream "$APPDIR" "$OUT"
+echo ">> AppImage: $OUT"

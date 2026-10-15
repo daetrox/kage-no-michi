@@ -1,0 +1,3 @@
+Créditos de los trucos (assets/cheats/*.cht):
+base de datos comunitaria de DuckStation (chtdb), https://github.com/duckstation/chtdb
+Los derechos de cada truco pertenecen a sus autores originales, tal como indica chtdb.

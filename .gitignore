@@ -1,0 +1,7 @@
+build/
+third_party/
+*.tar.gz
+*.AppImage
+build-win/
+KageNoMichi-*.zip
+tools/i18n/

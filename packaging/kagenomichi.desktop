@@ -1,0 +1,9 @@
+#!/usr/bin/env xdg-open
+[Desktop Entry]
+Type=Application
+Name=Kage no Michi
+Comment=Lanzador del juego (núcleo SwanStation)
+Exec=sh -c 'exec "$(dirname "$(readlink -f "%k")")/kagenomichi"'
+Terminal=false
+Categories=Game;
+StartupWMClass=kagenomichi

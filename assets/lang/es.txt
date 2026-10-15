@@ -1,0 +1,371 @@
+# Subtítulos de las escenas (es). Generado por tools/make_translation.py.
+# Cada línea: hash FNV-1a de la frase inglesa original <TAB> traducción.
+8b3ed37f	¡SALTA!
+251c4b55	Deteneos ahí mismo, por favor.
+189fe8b2	Parecéis tener mucha prisa
+5fb6870b	para ser tan tarde.
+134db098	¿Adónde vais?
+a10d86f2	Es una noche preciosa.
+d31369c1	Deberías buscarte un novio,
+35245ea2	no jugar con el arma de tu padre.
+fd3d64c6	¿Cómo te atreves a hablarme así?
+43e3c8ab	Te enseñaré modales.
+aefbf94b	He fracasado.
+c17fb0af	Si te preocuparas más
+a9b077ee	de tu destreza que de mis modales,
+747b3a0b	seguirías con vida.
+c15e98b8	Ahora sólo tengo que llegar
+88fd2b66	al otro lado.
+e925ffcf	Las tumbas de la colina
+d10de32e	estarán algo más concurridas.
+29829b50	¿Qué?
+4cce7a2e	¿Una niña como tú
+70972498	ha vencido a mi querida hermana?
+57efd0d4	Sólo le he dado
+53d5c7f9	una pequeña lección de modales.
+ce0bd33e	Y tú eres el siguiente.
+593d76e1	¡No!
+b61b632b	En la lección de hoy
+89476bc5	aprenderás cómo
+bc40aa4a	un maestro Myojinsoga usa la espada
+f202554b	para vengar a su hermana.
+7ad93c6d	Tazu,
+41da93ef	no he podido vengarte,
+b020b4e7	querida hermana.
+a635a88a	Te he fallado como hermano
+f3e7fe53	y como guerrero...
+d1a7b5ae	Hermano y hermana, ¿eh?
+c2c4f133	Vuestros padres no debieron
+33b41150	de hacerlo muy bien.
+4fb94843	He vengado tu muerte.
+5036545c	La noche no es momento para que
+580a3275	una mujer se entrene.
+cf183fe6	¡Apártate!
+e83e0148	La única forma de cruzar este puesto
+7847b5a4	es pasando por encima de mí.
+94cfe806	Y ahora, ¿por qué no
+f192593e	te portas bien
+2381ba99	y me dices adónde vas
+c5214d9e	y por qué?
+78b9e6a6	Has sido una rival hábil
+0b36da2f	y honorable.
+c49fb963	Es una lástima
+f092b3b3	que el destino te negara
+de79d7d2	ser una mujer feliz y corriente.
+0fc91d56	Sólo tengo que llegar
+e89d1455	Las tumbas de la colina
+3ecf9154	estarán algo más concurridas.
+9a9e872b	Perdonad a mi inmadura hermana
+2fd63ef1	por su descortesía en la puerta.
+69a6532e	Vuestra hermana era una mujer valiente.
+56cc1efd	Tengo prisa por volver
+40173e12	junto a mi señor.
+1609d457	Os ruego que me dejéis pasar.
+120876d3	Como vos,
+bdd523a3	yo también sirvo a un superior.
+a27b38e1	Mis órdenes son deteneros.
+88fc056f	Soy Senjuro Akechi,
+a83d58fc	maestro
+d9838408	de la esgrima del estilo Myojinsoga.
+c6aadaf7	Resolvamos esto
+31f5848a	con nobleza y honor.
+386322d8	En nombre del clan ninja Azuma,
+24fa49f4	acepto vuestro desafío.
+ec087d85	¡Comenzad!
+7822f52a	Es un honor ser derrotado
+c1887ae6	por alguien tan hábil como vos.
+f5344093	Sois un maestro de la espada
+a71f0ad5	y un hombre de honor.
+f00726cd	no pudiéramos luchar como aliados.
+5a55ad4d	Habéis sido un rival
+1172cb00	digno y poderoso.
+4430c2d2	Incluso en la muerte
+0968db80	honráis
+3bb836b9	al clan ninja Azuma.
+91708345	Vamos, vamos.
+b54cbf2a	¿Qué? ¿Quién eres?
+907be216	Has sido un chico malo.
+313d9c32	Ha llegado la hora de pagar.
+8403c8b1	¡Socorro, que alguien me ayude!
+96472e67	¡A por ella! ¡A por ella!
+f2fb1f68	Parece que has elegido
+696d1005	la fiesta equivocada.
+3d3ce918	He venido a por Echigoya,
+7def4382	pero parece
+e38798b3	que antes tendré que ocuparme de ti.
+649f3b0b	Tanto hablar para nada.
+2369d446	¿Dónde se habrá escondido
+34054af1	ese viejo verde?
+19562b5e	¡Aléjate!
+8dc8420f	¡Ayudadme!
+ac76bbc0	¡Que alguien me ayude!
+d34f6dda	Ahora estamos tú y yo solos.
+bdb6aea5	Mi dinero,
+1383d700	¡mi dineeero!
+8ace0fda	No lo necesitarás
+08ce353f	allí adonde vas...
+d440706c	Tengo dinero.
+45c1a5e2	El dinero es poder.
+d399fa6f	Y el poder lo es todo.
+ea25cf55	He venido a vengar
+03cfeea2	a todos los inocentes que has dañado.
+4ee994d8	¡A por él, a por él!
+5560259c	Mi asunto es con Echigoya.
+3e9ebfdf	Apártate
+aea9c331	o tendré que matarte.
+f0282f23	Echigoya,
+a5286f50	¿dónde te has escondido?
+1d140c66	Tus guardaespaldas han muerto.
+9c6c8f23	¡Y tú eres el siguiente!
+9ec05055	Tu codicia me da asco.
+a8a836cf	Espero que tu muerte
+0fd4bf08	sirva de lección a otros.
+73b1a5c3	Pase lo que pase,
+d4d35b27	este mensaje llegará a su destino.
+5d558372	Perdón,
+2e80375d	me he parado a tomar algo.
+aa826ec0	Lo has hecho bien.
+22caa857	Ven,
+cfa8fe44	el señor Gohda te espera.
+02cd4f91	Presiento peligro.
+b7ea7ca5	Será mejor que me dé prisa.
+7caf1c60	Perdonad mi retraso.
+2025ad82	No, no. Lo has hecho bien.
+3c703746	El señor Gohda te espera. Ven.
+41b4b273	Goo quiere amigo nuevo.
+ec672851	¡Vaya! ¡Los ratones salen a jugar!
+9cceddea	¡Así Goo también juega!
+86706169	Goo ya no puede jugar más.
+cdbe8ab8	Goo cansado...
+08a45997	Eres repugnante.
+dcfcd6b1	Muérete de una vez.
+c6e8166d	He de admitir que estoy impresionado.
+304fa77b	¿Quién eres?
+036fb088	Soy Onikage.
+cf3d84c9	Algún día vendré
+4b762aa2	a por Gohda y vuestras cabezas.
+d3409649	Hasta entonces, conviértete
+acbea299	en un rival más digno de mí.
+9f61ca35	No deberías haber hecho esto.
+d19d01f3	¿Y dejarte morir?
+ca489cc4	Dale las gracias al señor Gohda
+4fdaa50d	por saltarse las normas.
+efc1fa6c	Estoy en deuda con él.
+fee897e2	Muere en paz,
+2bf84714	alma descarriada.
+d5228cd7	¿Quién anda ahí?
+642f7197	Algún día vendré a por Gohda
+b9a6fcec	y a por vuestras cabezas.
+c18adbaf	Te ha costado llegar.
+d7b076bf	Disculpa.
+dacfd08b	Supongo que esta vez
+0f3ede27	te mereces un «gracias».
+bdc7d10c	Sé lo que quieres.
+03ca1d26	Quieres la piedra.
+148faabd	Está a salvo en mi barriga.
+1a7b0cfd	No vas a conseguirla.
+a686b438	Así que ahí está.
+b79fcc54	Eso sólo significa
+e3d0553c	que tendré que destriparte.
+bf6d1366	Mmmi... mmmi... mmmi...
+ab6db29c	mi preciosa piedra...
+3d4c9987	Ahora es mi preciosa piedra.
+668196d3	Me ha resultado algo divertido.
+db903542	Volvemos a vernos.
+d1218717	Onikage...
+985f496c	¡tú eres el siguiente!
+cddb04a2	No lo creo.
+3f4acf29	¡Vamos!
+99c6bde4	Ya no podrás
+b2bb08ba	ver cómo se abre la piedra.
+3b012a65	¿Te envía el señor Gohda?
+a0dcb13c	Me da lástima.
+9bf69d6f	Te he subestimado.
+0ee9067c	La próxima vez morirás.
+dd395a80	Usas la piedra para hacer daño.
+35a7cbe0	Me la llevaré,
+9d180b22	aunque tenga que destriparte.
+e78feb10	Mmmi... mmmi... mmmi...
+43776a3f	Arde en el infierno, hereje.
+1af18c1e	¡Onikage!
+33d446a1	¡Así que tú también estás detrás!
+58c13cfd	¡Vamos!
+66965473	Eres valiente, pero insensato.
+5fc773f8	Morirás.
+5ff03c77	¿Así que quieres morir?
+fc8d9bf0	¡Muere!
+257990a4	Lo mismo digo,
+c60b1970	¡pescadero!
+8111361f	¡Dios mío!
+d03b50ce	No lo verás allí adonde vas.
+3c5db129	¡Gusano!
+d64879ee	¡Que te pudras!
+5cf472eb	No esperes piedad.
+89423eb8	Tu vida ha terminado.
+431f5c1d	Debe de ser triste morir
+f6321cf9	tan lejos de casa...
+793d0e23	Ésta es la extraña hierba
+f55f5d4f	que necesita la princesa Kiku...
+19ada1ec	Debo volver deprisa.
+154e0f17	Así que ésta es la hierba.
+a6ba0933	Princesa, ya voy.
+c7e61717	Has hecho bien en llegar hasta aquí.
+7a551ad1	El señor Mei-oh
+66f5f55b	quedaría impresionado.
+7e29ba86	¿Así que Mei-oh está detrás de todo?
+18a3f7eb	¿Qué más da?
+a3af889f	A estas horas, el castillo
+275abccf	de tu señor Gohda habrá caído.
+ff19d709	Y tú morirás aquí.
+9276377d	Necio.
+4cb9389a	Tus pobres habilidades te han fallado.
+4a42bfe4	Ve al infierno
+0fa52395	y espera allí a Gohda.
+8ec543ca	Al señor Mei-oh le divertirá verte.
+6947acb3	¿¡Se ha ido!?
+b985914e	¡Así que Onikage!
+1e6e8672	¿Tu señor Mei-oh está detrás de esto?
+982b0f3c	¿Qué? ¿¡Se ha ido!?
+f8f2d1c7	Ya veo
+30caa82d	que has venido a encontrar tu destino.
+d3512e2e	No me hagas reír.
+d9ea3e16	¿¡Cuántas veces tengo que matarte!?
+acd76c7e	Qué ingenua.
+12ccefdb	No puedes vencerme si voy en serio.
+d651d749	¿Ah, sí?
+69a462c4	Pues entonces
+7783bfba	¡esto no te preocupará!
+2c3dd93a	Basta. Has ganado.
+396961fb	Tu princesa Kiku está abajo,
+a90c7884	vigilada por el mismo señor Mei-oh.
+5e882498	Nos veremos en el infierno.
+534c28b6	Ahora que he entrado en calor,
+255ae741	¡le toca al señor Mei-oh!
+558a651d	Eso ha sido entretenido.
+4ccdf623	Así que has matado a Onikage.
+a88a4b61	¿Quién lo habría creído posible?
+f6f5a6d7	Mei-oh, cállate y dime
+bce3cb07	¡dónde está Kiku!
+4ff3f409	No te preocupes por la chica.
+cf5b65c2	Piensa en salvar tu pellejo.
+2397d1db	Por mucho que se esfuercen,
+ce43bb4a	los humanos son frágiles.
+8acc4355	Tan débiles.
+f8ab60ef	Tan patéticos.
+1153e1c8	¡Así que has vuelto!
+b782c1a4	¡Esta vez no regresarás!
+8f9739f4	¡Eso ya lo veremos!
+d12ce942	Onikage, te he destruido,
+c479a390	¡y tu amo Mei-oh es el siguiente!
+49ee598d	¡Dime dónde está la princesa Kiku!
+0094924e	El señor Gohda espera mucho de ti.
+31eb5eb0	El enemigo será hábil y despiadado.
+13b62143	Debes estar preparada,
+c31e12c8	en cuerpo y en espíritu.
+f85cdd5f	Debes concentrarte,
+f3a2b2d4	entrenar duro
+614af272	y entrenar bien.
+90ebd45d	Oh, Ayame.
+f1edb816	Mi padre estará
+a93f9478	muy contento contigo.
+4cbdf1f8	Mi padre quedará satisfecho.
+1413cd7d	Tienes que hacerlo mucho,
+32d6ce6c	muchísimo mejor.
+d741a216	Si no lo haces mejor,
+77712201	mi padre no estará contento.
+a0dc50be	¡Lo haces fatal!
+7c8974d1	No soporto mirarte.
+a242e941	El señor Gohda espera mucho de ti.
+15b62469	Debes estar preparado,
+0e57c012	en cuerpo y en espíritu.
+811fbc68	entrenar duro
+1bd63568	¡Excelente!
+b718d5e3	Me traerás un gran honor.
+6e3f023b	Bien hecho.
+aa9a942b	Has entrenado bien.
+a11893c2	Debes hacerlo mejor.
+75316d78	Sé que puedes.
+129a6071	¡Tienes que esforzarte más!
+ffa3deb1	Tienes que concentrarte.
+72d4a66d	Me decepcionas.
+ad858ce8	Sólo traerás vergüenza.
+d84c6423	Al ministro Kataoka le gusta el dinero.
+b2a28bb2	¿Qué es esto, Bizenya?
+3d77fce7	Hay más de lo habitual...
+a4d4ac70	No podríamos hacer negocios
+c412349e	sin vos...
+a71d99fa	El dinero no es más que una muestra
+fae6858d	de nuestro agradecimiento.
+225b4f62	Me gusta cómo piensas.
+a42943c8	¿En qué puedo ayudarte hoy?
+642890bd	Hemos presentado ofertas
+9167069d	para las obras
+ffede10e	del mes que viene,
+fa9f07b4	si pudierais...
+8e53ea36	Déjalo en mis manos.
+79db29c3	Pero recuerda
+d7085086	lo que le pasó a Echigoya.
+0cf1bc72	Ve con cuidado.
+ceed1c8c	Eh, tú, ¿dónde está tu jefe?
+29d01c30	Tú,
+aa83a937	¡eres la ninja del señor Gohda!
+9360af83	Qué oportuno que vengas aquí.
+2df3ed1b	Tengo órdenes de matarte.
+4d9e0668	¡Es-espera!
+c3825c7d	Por favor,
+ace54636	perdóname la vida.
+9ebe8dc3	Te propongo un trato.
+3df1a775	Dime dónde está tu jefe
+eb70de60	y quizá te deje vivir.
+d3169d0a	El a-a-amo ha salido.
+b2945cba	De-de-debería volver pronto.
+81510913	El ministro Kataoka debería estar
+e3cb4a68	a salvo durante un tiempo.
+c85d7a67	El señor Gohda confiaba en ti.
+546a4ccf	¿Cómo has podido traicionarlo?
+384741e7	Puede que haya cometido errores,
+076a040b	pero no permito que ninguna mujer
+daf09b1f	me regañe de esa manera.
+25340b9c	¡Morirás bajo mis flechas!
+31c3c1e6	Tus flechas son como tú,
+90bbb9e2	débiles y retorcidas.
+622c0379	NO les tengo miedo.
+ac26b35b	¿Qu-qué?
+23ede478	¿Cómo he podido perder?
+2ce7f859	Le robaste al señor Gohda.
+4e73df54	¿Cómo ibas a ganar?
+d341a71b	Seguro que ahora
+dc1e0a55	no te sientes tan listo.
+0404a788	¿Dónde está el ministro Kataoka?
+7fa18af4	Te lo preguntaré sólo una vez más.
+1c35c295	¿Dónde está Kataoka?
+c3f50ce2	Ministro Kataoka,
+84f9c666	os habéis cubierto
+b1f231d1	de vergüenza.
+847fe8fe	Nunca pensé
+ad176ceb	que el señor Gohda me descubriría.
+b13d01f2	Quitaos la vida y demostradme
+bdac3466	que aún os queda algo de honor.
+aa090726	Yo os asistiré.
+e7812e14	Sí,
+acd52c9e	gracias...
+fbe7e8b8	Contadle al señor Gohda
+1ffdf6a9	cómo he muerto.
+f871ef8d	Informaré al señor Gohda
+c1da2f84	de vuestro honorable final.
+1c66b400	¡No puede ser!
+0b192eaf	¿Un simple humano?
+c71534d0	Adiós y hasta nunca.
+8408ec26	¡Y no vuelvas!
+b0ea78b3	¡Ayame!
+4031df62	¡Princesa! ¡Qué alivio veros a salvo!
+80844e35	Rikimaru me salvó, pero tenía miedo.
+fff9a18b	Ayame, aquí no estamos seguras.
+385a2938	¡Tenemos que irnos ya!
+79501e51	Los enemigos del señor Gohda
+755802f2	mueren bajo esta hoja.
+89c4938e	¡Rikimaru!
+26578ab4	¡Princesa Kiku! ¡Estáis a salvo!
+40e6d25a	Ayame me salvó, pero tenía miedo.
+f8d7eefc	Rikimaru, aquí es peligroso.
+3eb80bc1	Será mejor que nos vayamos.

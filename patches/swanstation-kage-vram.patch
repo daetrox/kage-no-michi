@@ -1,0 +1,491 @@
+diff --git a/src/core/CMakeLists.txt b/src/core/CMakeLists.txt
+index 460ea0f..61dddb6 100644
+--- a/src/core/CMakeLists.txt
++++ b/src/core/CMakeLists.txt
+@@ -31,6 +31,7 @@ add_library(core
+     gpu_backend.cpp
+     gpu_backend.h
+     gpu_commands.cpp
++    kage_vram.cpp
+     gpu_hw.cpp
+     gpu_hw.h
+     gpu_hw_opengl.cpp
+diff --git a/src/core/gpu.h b/src/core/gpu.h
+index 0a0959f..a084c4d 100644
+--- a/src/core/gpu.h
++++ b/src/core/gpu.h
+@@ -7,6 +7,7 @@
+ #include "types.h"
+ #include <algorithm>
+ #include <array>
++#include <cstring>
+ #include <deque>
+ #include <memory>
+ #include <vector>
+@@ -146,6 +147,20 @@ public:
+   // Returns the video clock frequency.
+   TickCount GetCRTCFrequency() const;
+ 
++  // Kage no Mon (kage_vram.cpp).
++  void KageReupload(uint32_t x, uint32_t y, uint32_t w, uint32_t h, const uint16_t* data)
++  {
++    FlushRender();
++    UpdateVRAM(x, y, w, h, data, false, false);
++  }
++  void KageRead(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint16_t* out)
++  {
++    FlushRender();
++    ReadVRAM(x, y, w, h);
++    for (uint32_t row = 0; row < h; row++)
++      std::memcpy(out + row * w, m_vram_ptr + (y + row) * VRAM_WIDTH + x, w * sizeof(uint16_t));
++  }
++
+ protected:
+   TickCount CRTCTicksToSystemTicks(TickCount crtc_ticks, TickCount fractional_ticks) const;
+   TickCount SystemTicksToCRTCTicks(TickCount sysclk_ticks, TickCount* fractional_ticks) const;
+diff --git a/src/core/gpu_commands.cpp b/src/core/gpu_commands.cpp
+index 3e2732a..2de573d 100644
+--- a/src/core/gpu_commands.cpp
++++ b/src/core/gpu_commands.cpp
+@@ -1,5 +1,6 @@
+ #include "common/string_util.h"
+ #include "cpu_core.h"
++#include "kage_vram.h"
+ #include "gpu.h"
+ #include "interrupt_controller.h"
+ #include "system.h"
+@@ -493,6 +494,8 @@ void GPU::FinishVRAMWrite()
+ 
+   if (m_blit_remaining_words == 0)
+   {
++    KageVRAM::OnWrite(m_vram_transfer.x, m_vram_transfer.y, m_vram_transfer.width, m_vram_transfer.height,
++                      reinterpret_cast<uint16_t*>(m_blit_buffer.data()));
+     UpdateVRAM(m_vram_transfer.x, m_vram_transfer.y, m_vram_transfer.width, m_vram_transfer.height,
+                m_blit_buffer.data(), m_GPUSTAT.set_mask_while_drawing, m_GPUSTAT.check_mask_before_draw);
+   }
+diff --git a/src/core/kage_vram.cpp b/src/core/kage_vram.cpp
+new file mode 100644
+index 0000000..25c22d4
+--- /dev/null
++++ b/src/core/kage_vram.cpp
+@@ -0,0 +1,387 @@
++// Kage no Mon: parches de píxeles sobre subidas concretas a la VRAM.
++//
++// El launcher envía los parches ya generados (kage_vram_set_patches). Un parche identifica una
++// subida por su tamaño y su hash XXH3-128 (el mismo que usa la sustitución de texturas de
++// SwanStation) y cambia píxeles dentro de ella. Así sólo se distribuyen los iconos dibujados por el
++// launcher, nunca las texturas del juego.
++//
++// Formato de cada registro (little endian):
++//   "KVP2"  u64 hash_low  u64 hash_high  u16 width  u16 height  (en palabras de 16 bits)
++//   u16 bpp (4, 8 o 16)  u16 keep (valor de píxel que deja el original)  u16 rect_count
++//   por rectángulo: u16 x  u16 y  u16 w  u16 h  (en píxeles)  y w*h valores de píxel (u16)
++#include "kage_vram.h"
++#include "gpu.h"
++#include "xxhash.h"
++
++#include <cstdio>
++#include <cstdlib>
++#include <cstring>
++#include <array>
++#include <map>
++#include <string>
++#include <vector>
++
++// Funciones que el launcher busca en el núcleo (dlsym / GetProcAddress).
++#ifdef _WIN32
++#define KAGE_EXPORT __declspec(dllexport)
++#else
++#define KAGE_EXPORT __attribute__((visibility("default")))
++#endif
++
++namespace {
++
++struct Rect
++{
++  uint16_t x, y, w, h;
++  std::vector<uint16_t> pixels;
++};
++
++struct Patch
++{
++  uint16_t width, height, bpp, keep;
++  std::vector<Rect> rects;
++};
++
++using Key = std::pair<uint64_t, uint64_t>;
++
++// Subidas vigiladas: dónde las coloca siempre el juego en la VRAM y, si ya se conoce, su
++// contenido original (para volver a él).
++struct Watch
++{
++  uint32_t x, y;
++  uint32_t w = 0, h = 0;
++  std::vector<uint16_t> original;
++  // fixed: el juego nunca usa ese sitio para otra cosa. Si no, se sigue si la textura sigue allí
++  // (otra subida encima la quita); tras cargar un estado no se sabe y se comprueba en la VRAM.
++  bool fixed = false;
++  enum class Resident { Unknown, Yes, No } resident = Resident::Unknown;
++  // Zonas (palabra x, fila, ancho en palabras, alto) que tienen ahora iconos del launcher.
++  std::vector<std::array<uint32_t, 4>> zones;
++};
++
++// Zonas de palabras que tocan los rectángulos de un parche.
++std::vector<std::array<uint32_t, 4>> Zones(const Patch& p)
++{
++  std::vector<std::array<uint32_t, 4>> out;
++  const uint32_t per = 16 / p.bpp;
++  for (const Rect& r : p.rects)
++  {
++    const uint32_t wx0 = r.x / per, wx1 = (r.x + r.w + per - 1) / per;
++    out.push_back({wx0, r.y, wx1 - wx0, r.h});
++  }
++  return out;
++}
++
++std::map<Key, Watch> s_watch;
++std::map<Key, Patch> s_patches; // parches activos (vacío = texturas originales)
++bool s_dirty = false;           // hay que reescribir las zonas vigiladas en el siguiente frame
++
++std::string s_log_path;
++const bool s_debug = std::getenv("KAGE_DEBUG") != nullptr;
++// Diagnóstico: lo subido por la CPU (con el renderizador OpenGL el núcleo no guarda copia).
++std::vector<uint16_t> s_shadow;
++
++bool ParsePatches(const uint8_t* p, size_t size, std::map<Key, Patch>* out)
++{
++  size_t pos = 0;
++  auto get = [&](void* dst, size_t n) {
++    if (pos + n > size)
++      return false;
++    std::memcpy(dst, p + pos, n);
++    pos += n;
++    return true;
++  };
++  while (pos < size)
++  {
++    char magic[4];
++    uint64_t lo = 0, hi = 0;
++    uint16_t count = 0;
++    Patch patch;
++    if (!get(magic, 4) || std::memcmp(magic, "KVP2", 4) != 0 || !get(&lo, 8) || !get(&hi, 8) ||
++        !get(&patch.width, 2) || !get(&patch.height, 2) || !get(&patch.bpp, 2) || !get(&patch.keep, 2) ||
++        !get(&count, 2) || (patch.bpp != 4 && patch.bpp != 8 && patch.bpp != 16))
++      return false;
++    const uint32_t width_px = patch.width * (16 / patch.bpp);
++    for (uint16_t i = 0; i < count; i++)
++    {
++      Rect r;
++      if (!get(&r.x, 2) || !get(&r.y, 2) || !get(&r.w, 2) || !get(&r.h, 2) || r.x + r.w > width_px ||
++          r.y + r.h > patch.height)
++        return false;
++      r.pixels.resize(static_cast<size_t>(r.w) * r.h);
++      if (!get(r.pixels.data(), r.pixels.size() * 2))
++        return false;
++      patch.rects.push_back(std::move(r));
++    }
++    (*out)[{lo, hi}] = std::move(patch);
++  }
++  return true;
++}
++
++Key Hash(uint32_t w, uint32_t h, const uint16_t* data)
++{
++  const XXH128_hash_t hash = XXH3_128bits(data, w * h * sizeof(uint16_t));
++  return {hash.low64, hash.high64};
++}
++
++// Escribe un píxel en una imagen de palabras de 16 bits con `stride` palabras por fila.
++void SetPixel(uint16_t* words, uint32_t stride, uint16_t bpp, uint32_t x, uint32_t y, uint16_t v)
++{
++  if (bpp == 16)
++  {
++    words[y * stride + x] = v;
++    return;
++  }
++  const uint32_t per = 16 / bpp, shift = (x % per) * bpp, mask = (1u << bpp) - 1;
++  uint16_t& w = words[y * stride + x / per];
++  w = static_cast<uint16_t>((w & ~(mask << shift)) | ((v & mask) << shift));
++}
++
++// Aplica un rectángulo del parche a una zona de palabras que empieza en la palabra `wx0` y la fila
++// `y0` de la subida.
++void ApplyRect(const Patch& p, const Rect& r, uint16_t* words, uint32_t stride, uint32_t wx0, uint32_t y0)
++{
++  const uint32_t per = 16 / p.bpp;
++  for (uint32_t row = 0; row < r.h; row++)
++    for (uint32_t col = 0; col < r.w; col++)
++    {
++      const uint16_t v = r.pixels[row * r.w + col];
++      if (v != p.keep)
++        SetPixel(words, stride, p.bpp, r.x + col - wx0 * per, r.y + row - y0, v);
++    }
++}
++
++} // namespace
++
++namespace KageVRAM {
++
++void OnWrite(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint16_t* data)
++{
++  if (s_watch.empty() && s_log_path.empty())
++    return;
++  const Key key = Hash(w, h, data);
++  if (!s_log_path.empty())
++  {
++    if (FILE* f = std::fopen(s_log_path.c_str(), "a"))
++    {
++      std::fprintf(f, "%016llx%016llx %u %u %u %u\n", static_cast<unsigned long long>(key.second),
++                   static_cast<unsigned long long>(key.first), x, y, w, h);
++      std::fclose(f);
++    }
++  }
++  // Una subida que tapa buena parte de una textura vigilada la quita de la VRAM (las pequeñas, como
++  // la paleta que el menú de objetos pone en la última fila de su fondo, no cuentan).
++  for (auto& [k, wa] : s_watch)
++  {
++    if (k == key || !wa.w)
++      continue;
++    const int64_t ox = std::min<int64_t>(x + w, wa.x + wa.w) - std::max<int64_t>(x, wa.x);
++    const int64_t oy = std::min<int64_t>(y + h, wa.y + wa.h) - std::max<int64_t>(y, wa.y);
++    if (ox > 0 && oy > 0 && ox * oy * 20 > static_cast<int64_t>(wa.w) * wa.h)
++    {
++      wa.resident = Watch::Resident::No;
++      wa.zones.clear();
++    }
++  }
++  const auto wit = s_watch.find(key);
++  if (wit != s_watch.end())
++  {
++    wit->second.resident = Watch::Resident::Yes;
++    Watch& wa = wit->second;
++    if (wa.original.empty())
++    {
++      wa.original.assign(data, data + w * h);
++      wa.w = w;
++      wa.h = h;
++    }
++    wa.zones.clear();
++    const auto pit = s_patches.find(key);
++    if (pit != s_patches.end() && pit->second.width == w && pit->second.height == h)
++    {
++      for (const Rect& r : pit->second.rects)
++        ApplyRect(pit->second, r, data, w, 0, 0);
++      wa.zones = Zones(pit->second);
++    }
++  }
++  if (!s_log_path.empty())
++  {
++    s_shadow.resize(VRAM_WIDTH * VRAM_HEIGHT);
++    for (uint32_t row = 0; row < h; row++)
++      for (uint32_t col = 0; col < w; col++)
++        s_shadow[((y + row) % VRAM_HEIGHT) * VRAM_WIDTH + (x + col) % VRAM_WIDTH] = data[row * w + col];
++  }
++}
++
++void Poll()
++{
++  if (!s_dirty || !g_gpu)
++    return;
++  s_dirty = false;
++  // Fuera de RunFrame el estado de OpenGL es el del frontend: se restaura el del núcleo.
++  g_gpu->RestoreGraphicsAPIState();
++  for (auto& [key, wa] : s_watch)
++  {
++    const auto pit = s_patches.find(key);
++    const Patch* patch = pit != s_patches.end() ? &pit->second : nullptr;
++    const uint32_t w = patch ? patch->width : wa.w, h = patch ? patch->height : wa.h;
++    if (w == 0 || wa.x + w > VRAM_WIDTH || wa.y + h > VRAM_HEIGHT || (!wa.fixed && wa.resident == Watch::Resident::No))
++      continue;
++    // Si la partida vino de un estado guardado, el juego no ha subido nada: si en la VRAM está la
++    // textura original sin tocar, se guarda para poder volver a ella.
++    if (wa.original.empty())
++    {
++      std::vector<uint16_t> cur(static_cast<size_t>(w) * h);
++      g_gpu->KageRead(wa.x, wa.y, w, h, cur.data());
++      if (s_debug)
++        std::fprintf(stderr, "kage: %016llx sin original; VRAM %s\n", (unsigned long long)key.second,
++                     Hash(w, h, cur.data()) == key ? "original" : "distinta");
++      if (Hash(w, h, cur.data()) != key)
++        continue; // otra cosa ocupa ese sitio (u otra variante ya aplicada): no se toca
++      wa.original = std::move(cur);
++      wa.w = w;
++      wa.h = h;
++      wa.resident = Watch::Resident::Yes;
++    }
++    // Tras cargar un estado: ¿sigue allí la textura? Se compara la VRAM con el original fuera de
++    // los rectángulos del parche (dentro puede haber otra variante de los iconos).
++    if (!wa.fixed && wa.resident == Watch::Resident::Unknown)
++    {
++      std::vector<uint16_t> cur(static_cast<size_t>(w) * h);
++      g_gpu->KageRead(wa.x, wa.y, w, h, cur.data());
++      std::vector<bool> masked(cur.size(), false);
++      if (patch)
++      {
++        const uint32_t per = 16 / patch->bpp;
++        for (const Rect& r : patch->rects)
++          for (uint32_t row = 0; row < r.h; row++)
++            for (uint32_t wx = r.x / per; wx < (r.x + r.w + per - 1) / per; wx++)
++              masked[(r.y + row) * w + wx] = true;
++      }
++      size_t total = 0, same = 0;
++      for (size_t i = 0; i < cur.size(); i++)
++        if (!masked[i])
++        {
++          total++;
++          same += cur[i] == wa.original[i];
++        }
++      wa.resident = (total && same * 100 >= total * 98) ? Watch::Resident::Yes : Watch::Resident::No;
++      if (s_debug)
++        std::fprintf(stderr, "kage: %016llx residente? %zu/%zu\n", (unsigned long long)key.second, same, total);
++      if (wa.resident == Watch::Resident::No)
++        continue;
++    }
++    if (!patch)
++    {
++      // Vuelta al original: sólo donde hay iconos del launcher (el resto puede tener otras cosas
++      // encima, como una paleta).
++      for (const auto& z : wa.zones)
++      {
++        std::vector<uint16_t> zone(static_cast<size_t>(z[2]) * z[3]);
++        for (uint32_t row = 0; row < z[3]; row++)
++          std::memcpy(zone.data() + row * z[2], wa.original.data() + (z[1] + row) * wa.w + z[0], z[2] * 2);
++        g_gpu->KageReupload(wa.x + z[0], wa.y + z[1], z[2], z[3], zone.data());
++      }
++      wa.zones.clear();
++      continue;
++    }
++    // Se reescriben sólo las palabras que tocan los rectángulos, partiendo del original.
++    const uint32_t per = 16 / patch->bpp;
++    for (const Rect& r : patch->rects)
++    {
++      const uint32_t wx0 = r.x / per, wx1 = (r.x + r.w + per - 1) / per, rw = wx1 - wx0;
++      std::vector<uint16_t> zone(static_cast<size_t>(rw) * r.h);
++      for (uint32_t row = 0; row < r.h; row++)
++        std::memcpy(zone.data() + row * rw, wa.original.data() + (r.y + row) * w + wx0, rw * sizeof(uint16_t));
++      ApplyRect(*patch, r, zone.data(), rw, wx0, r.y);
++      g_gpu->KageReupload(wa.x + wx0, wa.y + r.y, rw, r.h, zone.data());
++    }
++    wa.zones = Zones(*patch);
++  }
++  g_gpu->ResetGraphicsAPIState();
++}
++
++} // namespace KageVRAM
++
++extern "C" {
++
++// Vigila una subida (hash XXH3-128) que el juego coloca siempre en (x, y) de la VRAM.
++// `fixed`: el juego no usa nunca ese sitio para otra cosa.
++KAGE_EXPORT void kage_vram_watch(uint64_t hash_low, uint64_t hash_high, uint32_t x,
++                                                             uint32_t y, bool fixed)
++{
++  Watch& wa = s_watch[{hash_low, hash_high}];
++  wa.x = x;
++  wa.y = y;
++  wa.fixed = fixed;
++}
++
++// Contenido original de una subida vigilada, guardado por el launcher en una sesión anterior (sale
++// del disco del propio usuario). Sólo se acepta si su hash coincide.
++KAGE_EXPORT bool kage_vram_set_original(uint64_t hash_low, uint64_t hash_high,
++                                                                   uint32_t w, uint32_t h, const uint16_t* data)
++{
++  const auto it = s_watch.find({hash_low, hash_high});
++  if (it == s_watch.end() || Hash(w, h, data) != it->first)
++    return false;
++  it->second.original.assign(data, data + w * h);
++  it->second.w = w;
++  it->second.h = h;
++  return true;
++}
++
++// Copia el original de una subida vigilada, si ya se conoce. Devuelve su número de palabras (0 si
++// no se conoce); con `out` nulo o pequeño sólo informa del tamaño.
++KAGE_EXPORT size_t kage_vram_get_original(uint64_t hash_low, uint64_t hash_high,
++                                                                     uint32_t* w, uint32_t* h, uint16_t* out,
++                                                                     size_t max_words)
++{
++  const auto it = s_watch.find({hash_low, hash_high});
++  if (it == s_watch.end() || it->second.original.empty())
++    return 0;
++  *w = it->second.w;
++  *h = it->second.h;
++  const size_t n = it->second.original.size();
++  if (out && max_words >= n)
++    std::memcpy(out, it->second.original.data(), n * sizeof(uint16_t));
++  return n;
++}
++
++// Sustituye los parches activos (registros seguidos; size 0 = texturas originales). Lo que ya esté
++// en la VRAM se cambia en el siguiente frame.
++KAGE_EXPORT bool kage_vram_set_patches(const void* data, size_t size)
++{
++  std::map<Key, Patch> patches;
++  if (size && !ParsePatches(static_cast<const uint8_t*>(data), size, &patches))
++    return false;
++  s_patches = std::move(patches);
++  s_dirty = true;
++  return true;
++}
++
++// La VRAM ha cambiado por completo (estado cargado): se reescriben las zonas vigiladas.
++KAGE_EXPORT void kage_vram_refresh()
++{
++  for (auto& [k, wa] : s_watch)
++    wa.resident = Watch::Resident::Unknown;
++  s_dirty = true;
++}
++
++// Diagnóstico: registra cada subida (hash, x, y, ancho, alto) en un archivo de texto.
++KAGE_EXPORT void kage_vram_log(const char* path)
++{
++  s_log_path = path ? path : "";
++}
++
++// Diagnóstico: copia de la VRAM (1024x512, 16 bits) con lo subido por la CPU (requiere kage_vram_log).
++KAGE_EXPORT bool kage_vram_dump(const char* path)
++{
++  if (s_shadow.empty())
++    return false;
++  FILE* f = std::fopen(path, "wb");
++  if (!f)
++    return false;
++  std::fwrite(s_shadow.data(), 2, s_shadow.size(), f);
++  std::fclose(f);
++  return true;
++}
++}
+diff --git a/src/core/kage_vram.h b/src/core/kage_vram.h
+new file mode 100644
+index 0000000..eb4c43f
+--- /dev/null
++++ b/src/core/kage_vram.h
+@@ -0,0 +1,10 @@
++// Kage no Mon: cambio de texturas subidas a la VRAM (iconos de botones según el mando).
++#pragma once
++#include <cstdint>
++
++namespace KageVRAM {
++// Se llama con cada subida completa CPU->VRAM antes de aplicarla; puede modificar `data`.
++void OnWrite(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint16_t* data);
++// Se llama una vez por frame: vuelve a subir lo que haya cambiado de variante.
++void Poll();
++} // namespace KageVRAM
+diff --git a/src/libretro/libretro_host_interface.cpp b/src/libretro/libretro_host_interface.cpp
+index fc39fe0..b3be011 100644
+--- a/src/libretro/libretro_host_interface.cpp
++++ b/src/libretro/libretro_host_interface.cpp
+@@ -1,3 +1,4 @@
++#include "core/kage_vram.h"
+ #include "core/host_interface.h"
+ #include "common/byte_stream.h"
+ #include "common/file_system.h"
+@@ -97,6 +98,7 @@ RETRO_API void retro_reset(void)
+ 
+ RETRO_API void retro_run(void)
+ {
++  KageVRAM::Poll(); // Kage no Mon: cambio de iconos de botones pendiente
+   g_host_interface_storage.retro_run_frame();
+ }
+ 
