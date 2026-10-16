@@ -31,6 +31,10 @@ struct GameCamera
   uint32_t bones = 0x204;
   // Velocidad del personaje (x en +velocity, z en +velocity+4, 16 bits; 0 = el juego avanza según su giro).
   uint32_t velocity = 0;
+  // Estado del personaje (16 bits en +state; 0 = no se mira) y estados en los que se aplican los
+  // controles 360° (bit n = estado n). En los demás (usar objetos, atacar…) el juego recibe los
+  // controles originales.
+  uint32_t state = 0, steer_states = 0;
   float mark_above = 1650.0f, screen_half_h = 128.0f, screen_offset_y = 21.0f;
 };
 
@@ -46,10 +50,12 @@ const GameCamera kGames[] = {
   // en el modo 4, uno de los cuatro siguientes; 0x80030034 los gira con el personaje, 0x80039430
   // comprueba la colisión y 0x8002F708 suaviza (mismo formato que en Tenchu 2). El personaje
   // (0x80088044) tiene en +0x58 su transformación: posición en +0x18 y rotación en +0x50. Los modos
-  // 6–11 (pegado a una pared) usan otras tablas: ahí manda el juego. Aún sin fijar enemigo.
+  // 1 (primera persona: mirar con L1, apuntar el gancho o los shuriken) y 6–11 (pegado a una
+  // pared) son del juego. Controles 360° sólo quieto (estado 5), corriendo (6) o agachado (11).
   // Lista de personajes en 0x800BC410 (el primero, el jugador); matriz de cámara en 0x800C4128.
   {"SLUS-00706", 0x88074, 0x88114, 0x88048, 0x88044, 0xB5CD8, 0x88064, 0x88054, 0xBC410, 0xC4128,
-   0x58, 0x18, 0x58, 0x50, 0, 0x60E, 0xE03F, 0, 0x40, 1500.0f, 120.0f, 0.0f},
+   0x58, 0x18, 0x58, 0x50, 0, 0x60E, 0x1, 0, 0x40, 0x2, (1u << 5) | (1u << 6) | (1u << 11), 1500.0f, 120.0f,
+   0.0f},
 };
 
 constexpr float kDeadZone = 0.22f;
@@ -164,6 +170,8 @@ bool FreeCamera::SetGame(const std::string& serial)
       m_follow_modes = g.follow_modes;
       m_bones = g.bones;
       m_velocity = g.velocity;
+      m_state = g.state;
+      m_steer_states = g.steer_states;
       m_mark_above = g.mark_above;
       m_screen_half_h = g.screen_half_h;
       m_screen_offset_y = g.screen_offset_y;
@@ -680,6 +688,13 @@ void FreeCamera::Steer(uint8_t* ram, size_t size, float move_x, float move_y, fl
   uint32_t posp = 0, rot = 0;
   if (!PlayerParts(ram, size, &posp, &rot))
     return;
+  if (m_state)
+  {
+    const uint32_t obj = Get32(ram, m_player) & 0x1FFFFF;
+    const int16_t st = obj + m_state + 2 <= size ? Get16(ram, obj + m_state) : -1;
+    if (st < 0 || st >= 32 || !(m_steer_states >> st & 1))
+      return;
+  }
   m_steerable = true;
   const float mag = std::sqrt(move_x * move_x + move_y * move_y);
   const float current = (Get16(ram, rot + 2) & 0xFFF) * kTau / 4096.0f;
