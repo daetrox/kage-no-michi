@@ -29,6 +29,8 @@ struct GameCamera
   // Marca del enemigo fijado: huesos del personaje (0 = no se usan), altura sobre los pies, mitad de
   // la altura de la pantalla y desplazamiento vertical del centro de proyección.
   uint32_t bones = 0x204;
+  // Velocidad del personaje (x en +velocity, z en +velocity+4, 16 bits; 0 = el juego avanza según su giro).
+  uint32_t velocity = 0;
   float mark_above = 1650.0f, screen_half_h = 128.0f, screen_offset_y = 21.0f;
 };
 
@@ -47,7 +49,7 @@ const GameCamera kGames[] = {
   // 6–11 (pegado a una pared) usan otras tablas: ahí manda el juego. Aún sin fijar enemigo.
   // Lista de personajes en 0x800BC410 (el primero, el jugador); matriz de cámara en 0x800C4128.
   {"SLUS-00706", 0x88074, 0x88114, 0x88048, 0x88044, 0xB5CD8, 0x88064, 0x88054, 0xBC410, 0xC4128,
-   0x58, 0x18, 0x58, 0x50, 0, 0x60E, 0xE03F, 0, 1500.0f, 120.0f, 0.0f},
+   0x58, 0x18, 0x58, 0x50, 0, 0x60E, 0xE03F, 0, 0x40, 1500.0f, 120.0f, 0.0f},
 };
 
 constexpr float kDeadZone = 0.22f;
@@ -161,6 +163,7 @@ bool FreeCamera::SetGame(const std::string& serial)
       m_base_height = g.base_height;
       m_follow_modes = g.follow_modes;
       m_bones = g.bones;
+      m_velocity = g.velocity;
       m_mark_above = g.mark_above;
       m_screen_half_h = g.screen_half_h;
       m_screen_offset_y = g.screen_offset_y;
@@ -737,6 +740,24 @@ void FreeCamera::Steer(uint8_t* ram, size_t size, float move_x, float move_y, fl
   const int16_t value = static_cast<int16_t>(static_cast<int>(std::lround(yaw / kTau * 4096.0f)) & 0xFFF);
   std::memcpy(ram + rot + 2, &value, 2);
   m_steer_yaw = yaw;
+  // Si el juego guarda la velocidad aparte (Tenchu 1), se orienta igual: conserva su rapidez pero
+  // apunta hacia el nuevo giro. Si no, el personaje giraría pero seguiría avanzando en línea recta.
+  if (m_velocity)
+  {
+    const uint32_t obj = Get32(ram, m_player) & 0x1FFFFF;
+    if (obj && obj + m_velocity + 6 <= size)
+    {
+      const float vx = Get16(ram, obj + m_velocity), vz = Get16(ram, obj + m_velocity + 4);
+      const float speed = std::sqrt(vx * vx + vz * vz);
+      if (speed > 0.5f)
+      {
+        const int16_t nx = static_cast<int16_t>(std::lround(-std::sin(yaw) * speed));
+        const int16_t nz = static_cast<int16_t>(std::lround(-std::cos(yaw) * speed));
+        std::memcpy(ram + obj + m_velocity, &nx, 2);
+        std::memcpy(ram + obj + m_velocity + 4, &nz, 2);
+      }
+    }
+  }
 }
 
 std::string FreeCamera::BlockPatch(const std::string& serial, bool modern)

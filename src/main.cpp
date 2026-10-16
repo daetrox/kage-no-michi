@@ -1061,9 +1061,12 @@ void App::StartGame(bool resume)
     // Pruebas: TENCHU_TEST_POKE="13f1ce+=8,92580:32=41000" escribe (o suma) palabras de 16 bits
     // (o de 32 con ":32") en la RAM tras cada frame.
     // TENCHU_TEST_POKE_FRAMES=N: sólo durante los N primeros frames.
+    // TENCHU_TEST_POKE_FROM=N: sólo a partir del frame N.
     const char* poke_frames = std::getenv("TENCHU_TEST_POKE_FRAMES");
+    const char* poke_from = std::getenv("TENCHU_TEST_POKE_FROM");
     if (const char* poke = std::getenv("TENCHU_TEST_POKE");
-        poke && ram && (!poke_frames || m_emu.FramesRun() < static_cast<uint64_t>(std::atoll(poke_frames))))
+        poke && ram && (!poke_frames || m_emu.FramesRun() < static_cast<uint64_t>(std::atoll(poke_frames))) &&
+        (!poke_from || m_emu.FramesRun() >= static_cast<uint64_t>(std::atoll(poke_from))))
     {
       std::stringstream ss(poke);
       std::string item;
