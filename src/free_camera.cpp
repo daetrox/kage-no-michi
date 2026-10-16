@@ -39,6 +39,9 @@ struct GameCamera
   // cámara en primera persona (apuntar, mirar), en los que el eje vertical va invertido.
   bool digital_only = false;
   uint32_t first_person_modes = 0;
+  // Altura de la cabeza sobre los pies (negativa; 0 = se mide al activar la cámara libre) y cuánto se
+  // adelanta el punto de mira en la dirección de la vista (para ver lo que hay delante).
+  float head_height = 0, look_ahead = 0;
   float mark_above = 1650.0f, screen_half_h = 128.0f, screen_offset_y = 21.0f;
 };
 
@@ -59,7 +62,7 @@ const GameCamera kGames[] = {
   // Lista de personajes en 0x800BC410 (el primero, el jugador); matriz de cámara en 0x800C4128.
   {"SLUS-00706", 0x88074, 0x88114, 0x88048, 0x88044, 0xB5CD8, 0x88064, 0x88054, 0xBC410, 0xC4128,
    0x58, 0x18, 0x58, 0x50, 0, 0x60E, 0x1, 0, 0x40, 0x2, (1u << 5) | (1u << 6) | (1u << 11), true, 1u << 1,
-   1500.0f, 120.0f, 0.0f},
+   -1050.0f, 1000.0f, 1500.0f, 120.0f, 0.0f},
 };
 
 constexpr float kDeadZone = 0.22f;
@@ -162,6 +165,7 @@ bool FreeCamera::SetGame(const std::string& serial)
   m_modified = m_smooth_set = m_active = m_have_written = false;
   m_digital_only = false;
   m_first_person_modes = 0;
+  m_head_height = m_look_ahead = 0;
   for (const GameCamera& g : kGames)
     if (serial == g.serial)
     {
@@ -188,6 +192,8 @@ bool FreeCamera::SetGame(const std::string& serial)
       m_steer_states = g.steer_states;
       m_digital_only = g.digital_only;
       m_first_person_modes = g.first_person_modes;
+      m_head_height = g.head_height;
+      m_look_ahead = g.look_ahead;
       m_mark_above = g.mark_above;
       m_screen_half_h = g.screen_half_h;
       m_screen_offset_y = g.screen_offset_y;
@@ -494,7 +500,9 @@ void FreeCamera::Frame(uint8_t* ram, size_t size, float stick_x, float stick_y, 
     m_world_yaw = std::atan2(dx, dz);
     m_pitch = 0;
     m_returning = false;
-    m_head = static_cast<float>(target[1] - player[1]); // altura del punto de mira (quieto)
+    // Altura del punto de mira: la del juego, o la que tenga ahora (quieto). Al cargar una partida
+    // el juego aún puede tenerlo en los pies: por eso, si se conoce, se usa la fija.
+    m_head = m_head_height != 0 ? m_head_height : static_cast<float>(target[1] - player[1]);
     std::memcpy(m_last_target, player, sizeof(player));
     m_active = true;
   }
@@ -674,9 +682,9 @@ void FreeCamera::Frame(uint8_t* ram, size_t size, float stick_x, float stick_y, 
     head[0] + static_cast<int32_t>(std::lround(m_dist * std::sin(m_world_yaw))),
     head[1] + static_cast<int32_t>(std::lround(m_height)),
     head[2] + static_cast<int32_t>(std::lround(m_dist * std::cos(m_world_yaw))),
-    head[0],
+    head[0] - static_cast<int32_t>(std::lround(m_look_ahead * std::sin(m_world_yaw))),
     head[1],
-    head[2],
+    head[2] - static_cast<int32_t>(std::lround(m_look_ahead * std::cos(m_world_yaw))),
   };
   // Con un enemigo fijado, el punto de mira se adelanta hacia él para encuadrar a los dos.
   if (m_lock_obj)

@@ -112,6 +112,7 @@ private:
   uint32_t m_state = 0, m_steer_states = 0;
   bool m_digital_only = false;
   uint32_t m_first_person_modes = 0;
+  float m_head_height = 0, m_look_ahead = 0;
   float m_mark_above = 1650.0f, m_screen_half_h = 128.0f, m_screen_offset_y = 21.0f;
 
   std::vector<int16_t> m_original; // copia de la tabla sin tocar
