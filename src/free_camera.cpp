@@ -35,6 +35,10 @@ struct GameCamera
   // controles 360° (bit n = estado n). En los demás (usar objetos, atacar…) el juego recibe los
   // controles originales.
   uint32_t state = 0, steer_states = 0;
+  // Juego que sólo lee la cruceta digital (el joystick izquierdo se le pasa como cruceta) y modos de
+  // cámara en primera persona (apuntar, mirar), en los que el eje vertical va invertido.
+  bool digital_only = false;
+  uint32_t first_person_modes = 0;
   float mark_above = 1650.0f, screen_half_h = 128.0f, screen_offset_y = 21.0f;
 };
 
@@ -54,8 +58,8 @@ const GameCamera kGames[] = {
   // pared) son del juego. Controles 360° sólo quieto (estado 5), corriendo (6) o agachado (11).
   // Lista de personajes en 0x800BC410 (el primero, el jugador); matriz de cámara en 0x800C4128.
   {"SLUS-00706", 0x88074, 0x88114, 0x88048, 0x88044, 0xB5CD8, 0x88064, 0x88054, 0xBC410, 0xC4128,
-   0x58, 0x18, 0x58, 0x50, 0, 0x60E, 0x1, 0, 0x40, 0x2, (1u << 5) | (1u << 6) | (1u << 11), 1500.0f, 120.0f,
-   0.0f},
+   0x58, 0x18, 0x58, 0x50, 0, 0x60E, 0x1, 0, 0x40, 0x2, (1u << 5) | (1u << 6) | (1u << 11), true, 1u << 1,
+   1500.0f, 120.0f, 0.0f},
 };
 
 constexpr float kDeadZone = 0.22f;
@@ -143,11 +147,21 @@ bool FreeCamera::PlayerParts(const uint8_t* ram, size_t size, uint32_t* posp, ui
   return *posp > m_pos_add && *posp + 12 <= size && *rot > m_rot_add && *rot + 4 <= size;
 }
 
+bool FreeCamera::DigitalOnlyGame(const std::string& serial)
+{
+  for (const GameCamera& g : kGames)
+    if (serial == g.serial)
+      return g.digital_only;
+  return false;
+}
+
 bool FreeCamera::SetGame(const std::string& serial)
 {
   m_table_begin = m_table_end = 0;
   m_original.clear();
   m_modified = m_smooth_set = m_active = m_have_written = false;
+  m_digital_only = false;
+  m_first_person_modes = 0;
   for (const GameCamera& g : kGames)
     if (serial == g.serial)
     {
@@ -172,6 +186,8 @@ bool FreeCamera::SetGame(const std::string& serial)
       m_velocity = g.velocity;
       m_state = g.state;
       m_steer_states = g.steer_states;
+      m_digital_only = g.digital_only;
+      m_first_person_modes = g.first_person_modes;
       m_mark_above = g.mark_above;
       m_screen_half_h = g.screen_half_h;
       m_screen_offset_y = g.screen_offset_y;

@@ -716,6 +716,7 @@ private:
   bool m_test_saved = false;
   FreeCamera m_freecam;
   GameLanguage m_lang;
+  bool m_digital_only = false; // el juego sólo lee la cruceta
   // Idioma de los subtítulos del juego; sin elegir, el del launcher.
   GameLanguage::Text GameText() const
   {
@@ -726,6 +727,7 @@ private:
   bool m_l3_was_down = false;
   bool m_mouse_captured = false;       // ratón capturado para la cámara (esquema teclado y ratón)
   float m_look_dx = 0, m_look_dy = 0;  // movimiento del ratón pendiente
+  float m_aim_dx = 0, m_aim_dy = 0;    // ratón pendiente de convertir en cruceta (primera persona)
   float m_wheel_up_t = 0, m_wheel_down_t = 0; // pulsación breve de L2/R2 con la rueda
   bool m_mark_visible = false; // marca del enemigo fijado
   float m_mark_x = 0, m_mark_y = 0, m_mark_alpha = 0;
@@ -1032,6 +1034,7 @@ void App::StartGame(bool resume)
   m_emu.SetButtonPatches(GameButtonPatches());
   // Cámara libre: sólo fuera del modo hardcore (escribe en la RAM del juego).
   m_freecam.SetGame(m_cfg.free_camera && !m_hardcore_session ? Paths::ReadDiscSerial(m_cfg.game_path) : "");
+  m_digital_only = FreeCamera::DigitalOnlyGame(Paths::ReadDiscSerial(m_cfg.game_path));
   m_freecam.SetSpeed(m_cfg.camera_speed / 100.0f);
   std::string error;
   if (!m_emu.Start(m_cfg, m_window, m_gl, &error))
@@ -1859,6 +1862,45 @@ EmuInput App::GatherGameInput()
           1u << (m_freecam.Strafing() ? RETRO_DEVICE_ID_JOYPAD_DOWN : RETRO_DEVICE_ID_JOYPAD_UP));
     }
   }
+  const uint16_t up = 1u << RETRO_DEVICE_ID_JOYPAD_UP, down = 1u << RETRO_DEVICE_ID_JOYPAD_DOWN,
+                 left = 1u << RETRO_DEVICE_ID_JOYPAD_LEFT, right = 1u << RETRO_DEVICE_ID_JOYPAD_RIGHT;
+  // Juegos que sólo leen la cruceta: el joystick izquierdo se convierte en cruceta (si no actúan ya
+  // los controles 360°), para apuntar, moverse con los controles clásicos, etc.
+  if (m_digital_only && !(ModernControls() && m_freecam.Steerable()) && !(in.buttons & (up | down | left | right)))
+  {
+    const float sx = in.analog[0][0] / 32767.0f, sy = in.analog[0][1] / 32767.0f;
+    if (sx * sx + sy * sy >= 0.45f * 0.45f)
+    {
+      if (sy < -0.38f) in.buttons |= up;
+      if (sy > 0.38f) in.buttons |= down;
+      if (sx < -0.38f) in.buttons |= left;
+      if (sx > 0.38f) in.buttons |= right;
+    }
+  }
+  // Primera persona (apuntar, mirar): el juego invierte el eje vertical (abajo = mirar arriba); con
+  // los controles modernos, arriba mira arriba.
+  size_t ram_size = 0;
+  const uint8_t* ram = m_emu.SystemRam(&ram_size);
+  const bool first_person = ram && m_freecam.FirstPerson(ram, ram_size);
+  // Ratón en primera persona: el movimiento se convierte en pulsaciones de la cruceta (el juego no
+  // tiene otra forma de apuntar). Arriba = mirar arriba, como con el joystick.
+  if (first_person && m_cfg.kb_mouse)
+  {
+    constexpr float kPxPerFrame = 3.0f, kMaxPending = 45.0f;
+    m_aim_dx = std::clamp(m_aim_dx + m_look_dx, -kMaxPending, kMaxPending);
+    m_aim_dy = std::clamp(m_aim_dy + m_look_dy, -kMaxPending, kMaxPending);
+    m_look_dx = m_look_dy = 0;
+    if (m_aim_dx >= kPxPerFrame) { in.buttons |= right; m_aim_dx -= kPxPerFrame; }
+    else if (m_aim_dx <= -kPxPerFrame) { in.buttons |= left; m_aim_dx += kPxPerFrame; }
+    if (m_aim_dy >= kPxPerFrame) { in.buttons |= down; m_aim_dy -= kPxPerFrame; }
+    else if (m_aim_dy <= -kPxPerFrame) { in.buttons |= up; m_aim_dy += kPxPerFrame; }
+  }
+  else
+  {
+    m_aim_dx = m_aim_dy = 0;
+  }
+  if ((ModernControls() || m_cfg.kb_mouse) && first_person && ((in.buttons & up) != 0) != ((in.buttons & down) != 0))
+    in.buttons ^= up | down;
   m_last_input = in;
   return in;
 }

@@ -13,6 +13,7 @@
 #pragma once
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <string>
 #include <vector>
 
@@ -62,6 +63,17 @@ public:
     return e;
   }
   bool Active() const { return m_active; }
+  // El juego sólo lee la cruceta (Tenchu 1, anterior al DualShock), con o sin cámara libre.
+  static bool DigitalOnlyGame(const std::string& serial);
+  // Cámara en primera persona (apuntar con el gancho o los shuriken, mirar con L1).
+  bool FirstPerson(const uint8_t* ram, size_t size) const
+  {
+    if (!ram || !m_first_person_modes || m_mode + 2 > size)
+      return false;
+    int16_t mode;
+    std::memcpy(&mode, ram + m_mode, 2);
+    return mode >= 0 && mode < 32 && (m_first_person_modes >> mode & 1);
+  }
   // Devuelve la tabla y el suavizado del juego a su estado original (antes de guardar un estado, al
   // ceder la cámara al juego…); se vuelven a modificar en el siguiente frame si hace falta.
   void Restore(uint8_t* ram);
@@ -98,6 +110,8 @@ private:
   uint32_t m_bones = 0x204;
   uint32_t m_velocity = 0;
   uint32_t m_state = 0, m_steer_states = 0;
+  bool m_digital_only = false;
+  uint32_t m_first_person_modes = 0;
   float m_mark_above = 1650.0f, m_screen_half_h = 128.0f, m_screen_offset_y = 21.0f;
 
   std::vector<int16_t> m_original; // copia de la tabla sin tocar
