@@ -313,6 +313,8 @@ const char* Emulator::WidescreenPatch(const std::string& serial)
     const char* codes;
   };
   static const Patch patches[] = {
+    // Tenchu: Stealth Assassins (EE. UU.; comprobado con la Rev 1)
+    {"SLUS-00706", "D00C4108 1000+800C4108 0C00"},
     // Tenchu 2 (España)
     {"SLES-02465", "D00CCE90 1000+800CCE90 0C00+D00CFF78 1000+800CFF78 0C00"},
     // Tenchu 2 (Europa)

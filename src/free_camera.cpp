@@ -20,6 +20,16 @@ struct GameCamera
   uint32_t smooth_target;          // suavizado del punto de mira (mismo formato)
   uint32_t char_list;              // punteros a los personajes del nivel (el primero, el jugador)
   uint32_t cam_matrix;             // matriz de cámara del GTE (0x80072100): 3x3 en 1/4096 y traslación en +0x14
+  // Estructura del personaje: puntero en +pos_ptr (+pos_add) a su posición y en +rot_ptr (+rot_add) a
+  // su rotación (giro en +2); acción en +action (0 = no se usa). Altura sobre los pies desde la que el
+  // juego coloca la tabla, y modos de cámara que siguen al personaje (bit n = modo n).
+  uint32_t pos_ptr = 0x2C, pos_add = 0, rot_ptr = 0x30, rot_add = 0, action = 0x78;
+  float base_height = 0x73A;
+  uint32_t follow_modes = 0x1F; // 0 quieto, 2 girando en el sitio, 3 andando o corriendo, 4 agachado
+  // Marca del enemigo fijado: huesos del personaje (0 = no se usan), altura sobre los pies, mitad de
+  // la altura de la pantalla y desplazamiento vertical del centro de proyección.
+  uint32_t bones = 0x204;
+  float mark_above = 1650.0f, screen_half_h = 128.0f, screen_offset_y = 21.0f;
 };
 
 // Localizadas con volcados de RAM y desensamblando el código de la cámara: 0x800529F8 / 0x80051FB4
@@ -30,6 +40,14 @@ const GameCamera kGames[] = {
   {"SLUS-00939", 0x822B0, 0x82830, 0x8CFE0, 0x8CFF4, 0x92A48, 0x82DA4, 0x82D94, 0xC1398, 0xCD338},
   // Japón (Rittai Ninja Katsugeki Tenchu 2): igual, con el código de la cámara 0xD584 más adelante.
   {"SLPS-03040", 0x84028, 0x845A8, 0x8EBC0, 0x8EBD4, 0x94608, 0x84B1C, 0x84B0C, 0xC2F58, 0xCEEF8},
+  // Tenchu: Stealth Assassins (EE. UU.). 0x800302C8 elige el preajuste: el de reposo (0x80088074) o,
+  // en el modo 4, uno de los cuatro siguientes; 0x80030034 los gira con el personaje, 0x80039430
+  // comprueba la colisión y 0x8002F708 suaviza (mismo formato que en Tenchu 2). El personaje
+  // (0x80088044) tiene en +0x58 su transformación: posición en +0x18 y rotación en +0x50. Los modos
+  // 6–11 (pegado a una pared) usan otras tablas: ahí manda el juego. Aún sin fijar enemigo.
+  // Lista de personajes en 0x800BC410 (el primero, el jugador); matriz de cámara en 0x800C4128.
+  {"SLUS-00706", 0x88074, 0x88114, 0x88048, 0x88044, 0xB5CD8, 0x88064, 0x88054, 0xBC410, 0xC4128,
+   0x58, 0x18, 0x58, 0x50, 0, 0x60E, 0xE03F, 0, 1500.0f, 120.0f, 0.0f},
 };
 
 constexpr float kDeadZone = 0.22f;
@@ -39,7 +57,6 @@ constexpr float kPitchMin = -0.35f, kPitchMax = 0.9f;
 constexpr float kTargetJump = 2500.0f; // un salto así del objetivo = cinemática o cambio de escena
 constexpr float kTau = 6.28318530718f;
 // El juego coloca la tabla sobre la posición del personaje elevada 0x73A (0x80051FB4).
-constexpr float kBaseHeight = 0x73A;
 // Distancia ante un muro: se acerca deprisa y se aleja despacio (fracción por segundo, aprox.).
 constexpr float kPullIn = 14.0f, kPullOut = 2.5f, kHeightRate = 6.0f;
 // Fijar enemigo: alcance al fijar y distancia a la que se suelta (unidades del juego; la cámara va
@@ -56,22 +73,12 @@ constexpr float kProbeClear = 0.85f; // visible si el juego deja la cámara a �
 constexpr float kStrafeCone = 0.766f; // cos 40°
 constexpr float kStrafeSpeed = 1600.0f; // unidades por segundo (como retroceder en guardia)
 // Proyección del juego: SetGeomScreen(300) en una pantalla de 320x256 (0x800170F0).
-constexpr float kProjH = 300.0f, kScreenHalfW = 160.0f, kScreenHalfH = 128.0f;
-// El centro de proyección queda 21 líneas por debajo del centro de la imagen visible (medido).
-constexpr float kScreenOffsetY = 21.0f;
-constexpr float kMarkAbove = 1650.0f; // coronilla si no hay huesos fiables (la marca va un poco más arriba)
+constexpr float kProjH = 300.0f, kScreenHalfW = 160.0f;
 // Huesos del personaje: 15 posiciones en el mundo desde +0x204, cada 0x58 bytes; el 2 es la cabeza.
 // La marca va por encima de la coronilla: unas 350 unidades sobre ese hueso (más el casco, si lo hay).
-constexpr uint32_t kBones = 0x204, kBoneStride = 0x58;
+constexpr uint32_t kBoneStride = 0x58;
 constexpr int kHeadBone = 2;
 constexpr float kAboveHeadBone = 420.0f;
-
-// Modos de cámara del juego que siguen al personaje: 0 quieto, 2 girando en el sitio, 3 andando o
-// corriendo, 4 agachado. Con los demás (6 mirar con L1, 20 apuntar, nadar, cinemáticas…) manda el juego.
-bool FollowMode(int16_t mode)
-{
-  return mode >= 0 && mode <= 4;
-}
 
 float Shape(float v)
 {
@@ -118,6 +125,16 @@ bool IsPreset(const int16_t* e)
 
 } // namespace
 
+bool FreeCamera::PlayerParts(const uint8_t* ram, size_t size, uint32_t* posp, uint32_t* rot) const
+{
+  const uint32_t obj = Get32(ram, m_player) & 0x1FFFFF;
+  if (!obj || obj + std::max(m_pos_ptr, m_rot_ptr) + 4 > size)
+    return false;
+  *posp = ((Get32(ram, obj + m_pos_ptr) & 0x1FFFFF) + m_pos_add) & 0x1FFFFF;
+  *rot = ((Get32(ram, obj + m_rot_ptr) & 0x1FFFFF) + m_rot_add) & 0x1FFFFF;
+  return *posp > m_pos_add && *posp + 12 <= size && *rot > m_rot_add && *rot + 4 <= size;
+}
+
 bool FreeCamera::SetGame(const std::string& serial)
 {
   m_table_begin = m_table_end = 0;
@@ -136,6 +153,17 @@ bool FreeCamera::SetGame(const std::string& serial)
       m_smooth_target = g.smooth_target;
       m_char_list = g.char_list;
       m_cam_matrix = g.cam_matrix;
+      m_pos_ptr = g.pos_ptr;
+      m_pos_add = g.pos_add;
+      m_rot_ptr = g.rot_ptr;
+      m_rot_add = g.rot_add;
+      m_action = g.action;
+      m_base_height = g.base_height;
+      m_follow_modes = g.follow_modes;
+      m_bones = g.bones;
+      m_mark_above = g.mark_above;
+      m_screen_half_h = g.screen_half_h;
+      m_screen_offset_y = g.screen_offset_y;
     }
   return Available();
 }
@@ -169,7 +197,7 @@ void FreeCamera::Apply(uint8_t* ram, float yaw, float pitch)
     for (int v = 0; v < 2; v++)
     {
       t[e + v * 4] = 0;
-      t[e + v * 4 + 1] = static_cast<int16_t>(std::lround(m_head + kBaseHeight));
+      t[e + v * 4 + 1] = static_cast<int16_t>(std::lround(m_head + m_base_height));
       t[e + v * 4 + 2] = 0;
     }
     // Cámara (vectores 2 y 3): siempre los del preajuste de reposo (entrada 0), girados. Al correr el
@@ -191,11 +219,11 @@ void FreeCamera::Apply(uint8_t* ram, float yaw, float pitch)
 
 bool FreeCamera::EnemyPos(const uint8_t* ram, size_t size, uint32_t obj, int32_t pos[3]) const
 {
-  // Personaje: +0 clase (0 = jugador), +8 vida, +0x2C puntero a su posición.
-  if (!obj || obj + 0x30 > size || Get16(ram, obj) == 0 || Get16(ram, obj + 8) <= 0)
+  // Personaje: +0 clase (0 = jugador), +8 vida y un puntero a su posición (ver GameCamera).
+  if (!obj || obj + m_pos_ptr + 4 > size || Get16(ram, obj) == 0 || Get16(ram, obj + 8) <= 0)
     return false;
-  const uint32_t p = Get32(ram, obj + 0x2C) & 0x1FFFFF;
-  if (!p || p + 12 > size)
+  const uint32_t p = ((Get32(ram, obj + m_pos_ptr) & 0x1FFFFF) + m_pos_add) & 0x1FFFFF;
+  if (p <= m_pos_add || p + 12 > size)
     return false;
   std::memcpy(pos, ram + p, 12);
   return true;
@@ -261,7 +289,7 @@ void FreeCamera::ApplyProbe(uint8_t* ram, float rel_yaw, float dist, float heigh
     for (int v = 0; v < 2; v++)
     {
       t[e + v * 4] = 0;
-      t[e + v * 4 + 1] = static_cast<int16_t>(std::lround(m_head + kBaseHeight));
+      t[e + v * 4 + 1] = static_cast<int16_t>(std::lround(m_head + m_base_height));
       t[e + v * 4 + 2] = 0;
     }
     for (int v = 2; v < 4; v++)
@@ -281,9 +309,8 @@ bool FreeCamera::LockMarker(const uint8_t* ram, size_t size, float* sx, float* s
   int32_t p[3];
   if (debug_player)
   {
-    const uint32_t obj = Get32(ram, m_player) & 0x1FFFFF;
-    const uint32_t posp = obj && obj + 0x30 <= size ? Get32(ram, obj + 0x2C) & 0x1FFFFF : 0;
-    if (!posp || posp + 12 > size)
+    uint32_t posp = 0, rot = 0;
+    if (!PlayerParts(ram, size, &posp, &rot))
       return false;
     std::memcpy(p, ram + posp, 12);
   }
@@ -299,12 +326,12 @@ bool FreeCamera::LockMarker(const uint8_t* ram, size_t size, float* sx, float* s
   int32_t t[3];
   std::memcpy(m, ram + m_cam_matrix, sizeof(m));
   std::memcpy(t, ram + m_cam_matrix + 0x14, sizeof(t));
-  float v[3] = {static_cast<float>(p[0]), static_cast<float>(p[1]) - kMarkAbove, static_cast<float>(p[2])};
+  float v[3] = {static_cast<float>(p[0]), static_cast<float>(p[1]) - m_mark_above, static_cast<float>(p[2])};
   // Mejor sobre el hueso de la cabeza (sigue la estatura y la postura reales), si es coherente con la
   // posición del personaje.
   const uint32_t obj = debug_player ? (Get32(ram, m_player) & 0x1FFFFF) : m_lock_obj;
-  const uint32_t head = obj + kBones + kHeadBone * kBoneStride;
-  if (obj && head + 12 <= size)
+  const uint32_t head = obj + m_bones + kHeadBone * kBoneStride;
+  if (obj && m_bones && head + 12 <= size)
   {
     int32_t h[3];
     std::memcpy(h, ram + head, sizeof(h));
@@ -323,7 +350,7 @@ bool FreeCamera::LockMarker(const uint8_t* ram, size_t size, float* sx, float* s
   if (c[2] < 200.0f)
     return false; // detrás de la cámara o pegado a ella
   *sx = kProjH * c[0] / c[2] / kScreenHalfW;
-  *sy = (kProjH * c[1] / c[2] + kScreenOffsetY) / kScreenHalfH;
+  *sy = (kProjH * c[1] / c[2] + m_screen_offset_y) / m_screen_half_h;
   if (std::getenv("TENCHU_DEBUG_MARK"))
     std::fprintf(stderr, "marca: c=(%.0f %.0f %.0f) -> %.2f %.2f\n", c[0], c[1], c[2], *sx, *sy);
   return std::fabs(*sx) < 1.2f && std::fabs(*sy) < 1.2f;
@@ -351,9 +378,8 @@ void FreeCamera::Frame(uint8_t* ram, size_t size, float stick_x, float stick_y, 
 
   // Giro del personaje: puntero → +0x30 → rotación (giro en +2), en unidades de 4096 por vuelta.
   const uint32_t obj = Get32(ram, m_player) & 0x1FFFFF;
-  const uint32_t rot = obj && obj + 0x34 <= size ? Get32(ram, obj + 0x30) & 0x1FFFFF : 0;
-  const uint32_t posp = obj && obj + 0x30 <= size ? Get32(ram, obj + 0x2C) & 0x1FFFFF : 0;
-  if (!rot || rot + 4 > size || !posp || posp + 12 > size)
+  uint32_t posp = 0, rot = 0;
+  if (!PlayerParts(ram, size, &posp, &rot))
   {
     Restore(ram);
     return;
@@ -471,7 +497,7 @@ void FreeCamera::Frame(uint8_t* ram, size_t size, float stick_x, float stick_y, 
   // Al cambiar de modo de cámara (guardia → correr…) y al desenvainar o envainar (planos especiales
   // del juego) la posición deseada da saltos que no son muros: durante un momento no se tiene en cuenta.
   const int16_t mode = Get16(ram, m_mode);
-  const uint16_t action = obj + 0x7A <= size ? static_cast<uint16_t>(Get16(ram, obj + 0x78)) : 0;
+  const uint16_t action = m_action && obj + m_action + 2 <= size ? static_cast<uint16_t>(Get16(ram, obj + m_action)) : 0;
   if (mode != m_last_mode || (action & 0xFF00) == 0x700)
     m_ignore_game = 0.3f;
   m_last_mode = mode;
@@ -593,7 +619,7 @@ void FreeCamera::Frame(uint8_t* ram, size_t size, float stick_x, float stick_y, 
       // Altura en la tabla: relativa a los pies del personaje elevados kBaseHeight; al nivel de la
       // cabeza del candidato.
       ApplyProbe(ram, std::remainder(ang - player_yaw, kTau), m_probe_dist,
-                 static_cast<float>(e[1] - player[1]) + m_head + kBaseHeight);
+                 static_cast<float>(e[1] - player[1]) + m_head + m_base_height);
     }
   }
   else
@@ -648,9 +674,8 @@ void FreeCamera::Steer(uint8_t* ram, size_t size, float move_x, float move_y, fl
     m_have_prev = false;
   if (!ram || !Available() || !m_active || m_returning || m_mode + 2 > size || !FollowMode(Get16(ram, m_mode)))
     return;
-  const uint32_t obj = Get32(ram, m_player) & 0x1FFFFF;
-  const uint32_t rot = obj && obj + 0x34 <= size ? Get32(ram, obj + 0x30) & 0x1FFFFF : 0;
-  if (!rot || rot + 4 > size)
+  uint32_t posp = 0, rot = 0;
+  if (!PlayerParts(ram, size, &posp, &rot))
     return;
   m_steerable = true;
   const float mag = std::sqrt(move_x * move_x + move_y * move_y);
@@ -673,7 +698,6 @@ void FreeCamera::Steer(uint8_t* ram, size_t size, float move_x, float move_y, fl
   // la dirección m_world_yaw desde su cabeza); la derecha de la pantalla suma. Con un ángulo `a`, el
   // personaje mira (y avanza) en la dirección -(sin a, cos a).
   const float desired = m_world_yaw + std::atan2(move_x, -move_y);
-  const uint32_t posp = obj + 0x30 <= size ? Get32(ram, obj + 0x2C) & 0x1FFFFF : 0;
   if (m_lock_obj && posp && posp + 12 <= size)
   {
     const float mvx = -std::sin(desired), mvz = -std::cos(desired);         // hacia donde se quiere ir

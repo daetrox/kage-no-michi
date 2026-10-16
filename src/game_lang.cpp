@@ -11,7 +11,7 @@ namespace
 {
 constexpr const char* kSerial = "SLUS-00706";
 constexpr uint32_t kOptionsByte = 0x10048; // bit 0x08: voces japonesas
-constexpr size_t kBufferSize = 88;         // el búfer del subtítulo ocupa 0x58 bytes
+constexpr size_t kBufferSize = 64;         // el búfer del subtítulo ocupa 0x40 bytes
 
 // Cada ejecutable del juego se carga en 0x80011000; se reconocen por una instrucción del cargador
 // de los CAD («addiu a1, a1, %lo("%sSTAGE%d%c.CAD")»).
@@ -23,11 +23,16 @@ struct Exe
   uint16_t path_lo;
   uint32_t free_str;   // cadena sin usar en la versión americana («…\start\Card_i.txt», 38 bytes)
   uint32_t subtitle;   // búfer con la frase que se está mostrando
+  // Comando 8 de las escenas (copia la frase al búfer): «lui a0, %hi(búfer)» y «addiu a0, a0,
+  // %lo(búfer)». En español se cambian para que copie a free_str (que el juego no dibuja) y el
+  // launcher escribe la traducción en el búfer: así nunca se ve la frase inglesa. 0 = no se puede
+  // (en MENU y ENDING el destino sólo se puede mover ±32 KB y no hay hueco libre a ese alcance).
+  uint32_t copy_lui, copy_addiu;
 };
 const Exe kExes[] = {
-  {0x80050144, 0x2E20, 0x80050150, 0x2E30, 0x80013270, 0x800C08A8}, // MAIN.EXE (misiones)
-  {0x80022744, 0x2078, 0x80022748, 0x2088, 0x80011B34, 0x800926F8}, // MENU.EXE
-  {0x800191F8, 0x18D4, 0x800191FC, 0x18E4, 0x8001197C, 0x80084B50}, // ENDING.EXE
+  {0x80050144, 0x2E20, 0x80050150, 0x2E30, 0x80013270, 0x800C08A8, 0x8004FAB8, 0x8004FACC}, // MAIN.EXE (misiones)
+  {0x80022744, 0x2078, 0x80022748, 0x2088, 0x80011B34, 0x800926F8, 0, 0},                   // MENU.EXE
+  {0x800191F8, 0x18D4, 0x800191FC, 0x18E4, 0x8001197C, 0x80084B50, 0, 0},                   // ENDING.EXE
 };
 
 uint32_t Fnv1a(const std::string& s)
@@ -105,11 +110,8 @@ bool GameLanguage::Supported(const std::string& serial)
 
 std::string GameLanguage::PathPatch(const std::string& serial, Text text)
 {
-  if (serial != kSerial || (text != Text::French && text != Text::Italian))
+  if (serial != kSerial || text == Text::English)
     return "";
-  std::string path = text == Text::French ? "K:\\WORK\\CDIMAGE\\ANIM\\FRENCH\\" : "K:\\WORK\\CDIMAGE\\ANIM\\ITALIAN\\";
-  path.append(2 - path.size() % 2, '\0'); // terminada en cero y de longitud par
-
   std::string code;
   char line[48];
   auto add = [&](const Exe& e, uint32_t addr, uint16_t value) {
@@ -118,6 +120,18 @@ std::string GameLanguage::PathPatch(const std::string& serial, Text text)
                   e.check_val, addr & 0xFFFFFF, value);
     code += line;
   };
+  if (text == Text::Spanish)
+  {
+    for (const Exe& e : kExes)
+      if (e.copy_lui)
+      {
+        add(e, e.copy_lui, static_cast<uint16_t>((e.free_str + 0x8000) >> 16));
+        add(e, e.copy_addiu, static_cast<uint16_t>(e.free_str & 0xFFFF));
+      }
+    return code;
+  }
+  std::string path = text == Text::French ? "K:\\WORK\\CDIMAGE\\ANIM\\FRENCH\\" : "K:\\WORK\\CDIMAGE\\ANIM\\ITALIAN\\";
+  path.append(2 - path.size() % 2, '\0'); // terminada en cero y de longitud par
   for (const Exe& e : kExes)
   {
     for (size_t i = 0; i < path.size(); i += 2)
@@ -168,6 +182,25 @@ void GameLanguage::OnFrame(uint8_t* ram, size_t size)
     if (half(e.check) != e.check_val)
       continue;
     char* buf = reinterpret_cast<char*>(ram + (e.subtitle & 0x1FFFFF));
+    // Frase nueva copiada al búfer intermedio (comando 8 redirigido): se traduce al búfer real.
+    if (e.copy_lui)
+    {
+      char* stage = reinterpret_cast<char*>(ram + (e.free_str & 0x1FFFFF));
+      if (stage[0] == 'K' && stage[1] == ':')
+        stage[0] = 0; // aún la cadena original del juego (sin usar)
+      if (stage[0])
+      {
+        const std::string en(stage, strnlen(stage, kBufferSize - 1));
+        const auto it = m_table.find(Fnv1a(Trim(en)));
+        const std::string& out = it != m_table.end() ? it->second : en;
+        std::memcpy(buf, out.c_str(), out.size() + 1);
+        m_last = out;
+        stage[0] = 0;
+        return;
+      }
+    }
+    // Si el juego la copió directamente al búfer (antes de aplicarse el parche, o en MENU/ENDING),
+    // se sustituye allí; el juego llega a dibujar la inglesa durante un frame.
     const std::string cur(buf, strnlen(buf, kBufferSize));
     if (cur.empty() || cur == m_last)
       return;

@@ -1,4 +1,4 @@
-// Cámara libre para Tenchu 2 con el joystick derecho.
+// Cámara libre para Tenchu (1 y 2) con el joystick derecho.
 //
 // La cámara normal del juego parte de una tabla de vectores (posición de la cámara y del punto al
 // que mira, relativos al personaje) que se rotan con la orientación del personaje; luego el juego
@@ -78,6 +78,9 @@ private:
   void StartProbe(std::vector<uint32_t> candidates);
   void ApplyProbe(uint8_t* ram, float rel_yaw, float dist, float height);
   bool EnemyPos(const uint8_t* ram, size_t size, uint32_t obj, int32_t pos[3]) const;
+  // Posición (3 enteros) y rotación (giro en +2) del personaje; false si no son válidas.
+  bool PlayerParts(const uint8_t* ram, size_t size, uint32_t* posp, uint32_t* rot) const;
+  bool FollowMode(int16_t mode) const { return mode >= 0 && mode < 32 && (m_follow_modes >> mode & 1); }
 
   // Offsets en la RAM.
   uint32_t m_table_begin = 0, m_table_end = 0; // tabla de vectores de la cámara
@@ -89,6 +92,11 @@ private:
   uint32_t m_smooth_target = 0;                 // y del punto al que mira
   uint32_t m_char_list = 0;                     // lista de personajes (punteros; 0 = fin)
   uint32_t m_cam_matrix = 0;                    // matriz de cámara del GTE
+  uint32_t m_pos_ptr = 0x2C, m_pos_add = 0, m_rot_ptr = 0x30, m_rot_add = 0, m_action = 0x78;
+  float m_base_height = 0x73A;
+  uint32_t m_follow_modes = 0x1F;
+  uint32_t m_bones = 0x204;
+  float m_mark_above = 1650.0f, m_screen_half_h = 128.0f, m_screen_offset_y = 21.0f;
 
   std::vector<int16_t> m_original; // copia de la tabla sin tocar
   int16_t m_smooth_original[3] = {}, m_smooth_target_original[3] = {};

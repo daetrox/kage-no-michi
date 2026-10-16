@@ -6,8 +6,10 @@
 // Subtítulos de las escenas (ANIM\STAGE<n><R|A>.CAD):
 //   - francés e italiano: el disco americano conserva los CAD europeos en ANIM\FRENCH\ y
 //     ANIM\ITALIAN\. Se cambia la carpeta de la que se cargan (códigos GameShark condicionales).
-//   - español: el juego copia cada frase a un búfer fijo antes de dibujarla; el launcher la
-//     sustituye por su traducción (assets/lang/es.txt, indexada por un hash de la frase inglesa).
+//   - español: el juego copia cada frase a un búfer fijo (64 bytes) y la dibuja desde ahí. En las
+//     misiones (MAIN.EXE) la copia se desvía a una cadena sin usar y el launcher escribe en el búfer
+//     la traducción (assets/lang/es.txt, indexada por un hash de la frase inglesa); en MENU y ENDING
+//     se sustituye en el propio búfer (el juego llega a dibujar la inglesa durante un frame).
 //   La fuente del juego tiene las letras latinas con tilde y la ñ (no ¿ ni ¡).
 #pragma once
 
