@@ -5,3 +5,5 @@ third_party/
 build-win/
 KageNoMichi-*.zip
 tools/i18n/
+__pycache__/
+*.pyc
